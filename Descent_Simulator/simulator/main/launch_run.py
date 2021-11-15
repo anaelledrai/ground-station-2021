@@ -60,14 +60,18 @@ class Launch:
         new_longitude = math.atan2(y, z) + self.launch_longitude
         return new_latitude, new_longitude
 
-    # Hand made conversion coordinates + spherical coordinates reference system (physics)
-    #     # + XY plane with z pointing out for wind data reference system
+#      # Hand made conversion coordinates + spherical coordinates reference system (physics)
+#           # + XY plane with z pointing out for wind data reference system
     def conversion_coordinates(self, x, y):
-        new_latitude = self.launch_latitude + (y / (2.0 * math.pi * self.earth_radius)) * 360.0
-        new_longitude = self.launch_longitude + (
-                    x / (2.0 * math.pi * self.earth_radius * math.cos(math.radians(self.launch_latitude)))) * 360.0
-        return new_latitude, new_longitude
+           new_latitude = self.launch_latitude + (y / (2.0 * math.pi * self.earth_radius)) * 360.0
+           new_longitude = self.launch_longitude + (x / (2.0 * math.pi * self.earth_radius * math.cos(math.radians(self.launch_latitude)))) * 360.0
+           return new_latitude, new_longitude
 
+    # def conversion_coordinates(self, x, y):
+    #     new_latitude = self.launch_latitude + (y / (110.573 * 1000)) 
+    #     new_longitude = self.launch_longitude + (x / (111.324 * 1000 * math.cos(math.radians(new_latitude)))) 
+    #     return new_latitude, new_longitude
+              
     def calculate_vertical_drag_coeff(self, altitude):
         if altitude > self.drogue_deploy_altitude:
             return 0
