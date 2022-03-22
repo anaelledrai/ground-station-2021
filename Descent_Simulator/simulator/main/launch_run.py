@@ -14,7 +14,7 @@ class Launch:
     launch_latitude = 32.9925986  # AS
     launch_longitude = -106.9744309  # AS
 
-    def __init__(self, launch_zenith_angle, launch_azimuth_angle, wind_array, rocket_properties):
+    def __init__(self, launch_zenith_angle, launch_azimuth_angle, wind_array, rocket_properties, telemetry_string):
 
         # NB, unsure about the names 'zenith' and 'azimuth'; if inconsistent, azimuth == phi in the physics convention
         # for spherical coordinates and zenith is == theta. See wikipedia.
@@ -43,6 +43,9 @@ class Launch:
         self.rocket_mass = rocket_properties.rocket_mass
 
         self.apogee = rocket_properties.apogee
+        
+        telemetry_list = telemetry_string.split(',')
+        self.pressure = telemetry_list[7]
 
     # For the 3D Section + spherical coordinates reference system (physics)
     #     # + XY plane with z pointing out for wind data reference system
@@ -108,6 +111,22 @@ class Launch:
             # return self.kPa_to_Pa * 2.488 * ((self.calculate_temperature(altitude) + 273.15) / 216.6) ** -11.388
 
 
+    def calculate_temp_telemetry(self, altitude):
+
+        if altitude < 11000:
+            temperature = (self.pressure / (self.kPa_to_Pa * 101.29) ) ** (1/5.256) * 288.08
+            
+        elif altitude < 25000:
+            temperature = self.pressure / (self.kPa_to_Pa * 22.65 ) 
+        else: 
+            temperature = (self.pressure / (self.kPa_to_Pa * 2.488)) ** (1/-11.388) * 216.6
+
+        return temperature
+
+       
+    def calculate_density_telemetry(self, altitude):  # kg/m3
+        return self.pressure / (self.air_ideal_gas_constant * self.calculate_temp_telemetry(self, altitude))
+
     def calculate_density(self, altitude):  # kg/m3
         return self.calculate_pressure(altitude) / (self.air_ideal_gas_constant * self.calculate_temperature(altitude))
 
@@ -135,6 +154,13 @@ class Launch:
         A = self.calculate_transverse_cx_area()
         return A * Cd * rho * (wind_vel[0] ** 2) / 2, A * Cd * rho * (wind_vel[1] ** 2) / 2
 
+    def calculate_force_xy_telemetry(self, altitude):
+        Cd = self.calculate_transverse_drag_coeff(altitude)
+        wind_vel = self.calculate_wind_speed(altitude)
+        rho = self.calculate_density_telemetry(altitude)
+        A = self.calculate_transverse_cx_area()
+        return A * Cd * rho * (wind_vel[0] ** 2) / 2, A * Cd * rho * (wind_vel[1] ** 2) / 2
+
     def calculate_transverse_cx_area(self):
         return 0.27043539461  # was return 1 before
         # return 1
@@ -149,6 +175,17 @@ class Launch:
         # if net_force > 0:
         #   print("Ahhhh")
         return net_force
+
+    def calculate_force_z_telemetry(self, altitude, vel):
+        Cd = self.calculate_vertical_drag_coeff(altitude)
+        rho = self.calculate_density_telemetry(altitude)
+        m = self.rocket_mass
+        g = self.gravity_constant
+        # need to incorporate cross-sectional areas
+        net_force = Cd * rho * (abs(vel) ** 2) * self.get_cx_area(altitude) / 2 - m * g
+        # if net_force > 0:
+        #   print("Ahhhh")
+        return net_force   
 
     def get_cx_area(self, altitude):
         if altitude < self.main_deploy_altitude and self.main_deploys_bool:         # was & self.main_deploys_bool
@@ -195,8 +232,9 @@ class Launch:
         dt = 0
         while z > 0 and loops < max_loops:
             fx, fy = self.calculate_force_xy(z)
+            #fx,fy = self.calculate_force_xy_telemetry(z)
             fz = self.calculate_force_z(z, v_z)
-
+            # fz = self.calulate_force_z_telemetry(2, v_z)
             delta_v_x = fx * dt / self.rocket_mass
             delta_v_y = fy * dt / self.rocket_mass
             delta_v_z = fz * dt / self.rocket_mass
